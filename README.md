@@ -4,4 +4,4 @@ SpinSpotter is currently still under construction! The code hosted here function
 
 For an introduction to using SpinSpotter, check out the tutorial in github_tutorial.ipynb
 
-![This is an image](./images/acf_param_plot.png)
+![This is an image](/./images/acf_param_plot.png)
