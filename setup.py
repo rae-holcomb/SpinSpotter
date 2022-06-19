@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='spinspotter',
-    version='0.1.1',    
+    version='0.1.2',    
     description='Fast, autocorrelation-based algorithm for finding stellar rotation periods from light curves.',
     url='https://github.com/rae-holcomb/SpinSpotter',
     author='Rae Holcomb',
