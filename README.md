@@ -2,6 +2,8 @@
 SpinSpotter is an automated algorithm to calculate stellar rotation periods from high-cadence photometry.
 SpinSpotter is currently still under construction! The code hosted here functions but is still being cleaned up for usability.
 
+## Hey you! (Yes you :D)
+Thanks for checking out SpinSpotter! Please be aware that the code is in beta and things are changing fast--new tutorials, installation options, testing suites, and code functionality are being added as we speak. I highly recommend checking back pulling new updates often to make sure you're always working with the most up-to-date version of the code. And if you run into any issues or want to request certain features, please reach out to me!
 
 ## Installation
 Please install SpinSpotter using
