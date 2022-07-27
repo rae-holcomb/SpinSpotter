@@ -10,7 +10,7 @@ Welcome to SpinSpotter's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   function_library.rst
+   function_library
 
 
 Indices and tables
