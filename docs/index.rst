@@ -7,7 +7,7 @@ Welcome to SpinSpotter's documentation!
 =======================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
    function_library.rst
