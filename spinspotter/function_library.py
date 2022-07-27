@@ -27,19 +27,51 @@ day = 24*60*60
 
 # GENERAL HELPER FUNCTIONS
 def days_to_bins(days, bs):
-    """Given a value in days and a binsize in seconds, return the number of bins needed as an integer."""
+    """
+    Converts a time array given in units of days into units of bin number.
+
+    Args:
+        days (:obj:`array`): time array in units of days.
+        bs (:obj:`float`): the cadence to bin to, in units of seconds.
+
+    Returns:
+        :obj:`array`: the time array in units of bin number.
+    """
     return days*24*60*60//bs
 
-def bins_to_days(lags, bs):
-    """Given number of points (aka lags, int) and a binsize in seconds, returns the times."""
-    return lags*bs/(24*60*60)
+def bins_to_days(bins, bs):
+    """
+    Converts a time array given in units of bin number into units of days.
+
+    Args:
+        bins (:obj:`array`): time array in units of bin number or (in the case of the acf) lag number.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+
+    Returns:
+        :obj:`array`: the time array in units of days.
+    """
+    return bins*bs/(24*60*60)
 
 
 # NEW PROCESS HELPER FUNCTIONS
 
 def bin_lc(time, flux, flux_err=None, bs=cadence):
-    """ MUCH faster binning function the the built-in one from LightKurve. 
-    bs = size of the desired bin in seconds"""
+    """
+    Bins a timeseries to the desired cadence. Works much faster than Lightkurve's built in binning function.
+
+    Args:
+        time (:obj:`array`): time stamps of the lightcurve.
+        flux (:obj:`array`): flux values of the lightcurve.
+        flux_err (:obj:`array`): flux error values of the lightcurve.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+
+    Returns:
+    Two parameters, or three if a flux_err is also provided.
+
+        - time_bin (:obj:`array`): binned time stamps of the lightcurve.
+        - flux_bin (:obj:`array`): binned flux values of the lightcurve.
+        - flux_err_bin (:obj:`array`): binned flux errors values of the lightcurve. Only returned if an array is passed to flux_err.
+    """
     time_bin = np.arange(time[0], time[-1], bs/day)
     flux_bin = stats.binned_statistic(time, flux, bins=time_bin)[0]
 
@@ -55,22 +87,33 @@ def bin_lc(time, flux, flux_err=None, bs=cadence):
     return time_bin[:-1], flux_bin
 
 def median_normalize(lc):
-    """Normalizes a light curve by dividing by its median flux value. Returns a light curve object."""
+    """
+    Normalizes a light curve by dividing by its median flux value. Returns a light curve object.
+
+    Args:
+        lc (:obj:`LightCurve obj`): the lightcurve.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+
+    Returns:
+        lc (:obj:`LightCurve obj`): the median normalizedlightcurve.
+    """
     lc_norm = lc.copy()
     lc_norm.flux /= np.nanmedian(lc.flux.value)
     lc_norm.flux_err /= np.nanmedian(lc.flux.value)
     return  lc_norm
 
 def default_cleaning_func(lc, bs=cadence, transit=None):
-    """Given a lightkurve lc, applies the desired cleaning to it, including binning the LC. Returns a lightkurve LC.
-    Inputs:
-        lc -- a light curve file
-        binsize -- cadence to bin to in seconds, default is 30 minutes
-        transit -- array of transit paramters like [period, epoch, duration] in units of days
-                each entry can be an array if there are multiple planets
-    Outputs:
-        a light curve file with the desired cleaning applied
-        """
+    """
+    Given a lightkurve lc, applies the desired cleaning to it, including binning the LC. Returns a lightkurve LC.
+
+    Args:
+        lc (:obj:`LightCurve obj`): the lightcurve.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+        transit (:obj:`array`, optional): array of transit paramters like [period, epoch, duration] in units of days each entry can be an array if there are multiple planets
+
+    Returns:
+        lc (:obj:`LightCurve obj`): a light curve file with the desired cleaning applied
+    """
     # adjust date format for clarity
     lc.time.format = 'jd'
 
@@ -90,11 +133,17 @@ def default_cleaning_func(lc, bs=cadence, transit=None):
 
 def calc_fft_pgi(corr, bs=cadence):    
     """
-    docstring. The default pgi-finding funciton, using the FFT of the acf.
-    Inputs: corr - and acf
-    
-    Outputs: pgi - the index in the acf of the initial period guess in units of lags
-             results - dictionary of other relevant paramters from the pgi-finding code
+    Uses a fast fourier transform to identify an initial guess (pgi) for the dominant periodicity in the autocorrelation function. This is the default pgi-finding function for SpinSpotter.
+
+    Args:
+        corr (:obj:`arr`): an autocorrelation function.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+
+    Returns:
+    Two parameters.
+
+        - pgi (:obj:`int`): the index in the acf of the initial period guess in units of lags.
+        - results (:obj:`array`): dictionary of other relevant paramters from the pgi-finding code.
     """
     results = {}
 
@@ -130,14 +179,18 @@ def calc_fft_pgi(corr, bs=cadence):
 
 def fft_find_peaks(result, plot=False):
     """
-    Docstring. Helper function used by calc_fft_pgi to calculate the prominence of the max 
+    Helper function used by `calc_fft_pgi` to calculate the prominence of the max 
     peak in the fft.Does this by finding the five tallest peaks, then calculates the standard 
     deviation of the tallest one from the other four. setting plot to True will plot the FFT and
     the five found peaks. Currently, returns the number of standard deviations from
     the mean that the highest peak is.
-    
-    Input: the result dictionary as outputed by calc_fft_pgi(), which contains the fft
-    Output: the updated result dictionary, which now contains info on the pgi and peaks in the fft
+
+    Args:
+        result (:obj:`dict`):the result dictionary as outputed by calc_fft_pgi(), which contains the fft.
+        plot (:obj:`bool`): if True, will plot the FFT.
+
+    Returns:
+        results (:obj:`dict`): the updated result dictionary, which now contains info on the pgi and peaks in the fft.
     """
     output = result.copy()
     corr_fft = np.real(result['fft'])
@@ -225,8 +278,16 @@ def prep_LightCurveCollection(collection, bs=120):
     return lc_clean
 
 def gaussian(fwhm):
-    """ Creates a gaussian with a given FWHM as preparation for 
-    convolution with a light curve."""
+    """
+    Creates a gaussian with a given FWHM as preparation for convolution with a light curve.
+
+    Args:
+        fwhm (:obj:`float`): the full width half max of the desired gaussian.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+
+    Returns:
+        gaussian (:obj:`arr`): a gaussian.
+    """
     sigma = fwhm / 2.355
     x = np.arange(-3*sigma, 3*sigma)
     # note that we divide by .997 to preserve the normalization and make the
@@ -235,7 +296,14 @@ def gaussian(fwhm):
 
 def parabola(x,a,b,c):
     """
-    Defines a parabola. Intended to be used by curvefit in the process Test.
+    Creates a parabola of the form y = ax^2 + bx + c. Intended to be used by curvefit in the process Test.
+
+    Args:
+        x (:obj:`arr`): the x range of the function.
+        a, b, c (:obj:`float`): coefficients
+
+    Returns:
+        y (:obj:`arr`): a parabola.
     """
     return a*np.square(x) + b*x + c
 
