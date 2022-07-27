@@ -1,6 +1,6 @@
 numpy
 matplotlib
-matplotlib.pyplot as plt
+matplotlib.pyplot
 numpy
 pandas
 lightkurve
