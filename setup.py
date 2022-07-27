@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='spinspotter',
@@ -8,7 +8,7 @@ setup(
     author='Rae Holcomb',
     author_email='raeholcomb15@gmail.com',
     license='BSD 3-clause',
-    packages=['SpinSpotter'],
+    packages=find_packages(),
     install_requires=['matplotlib',
                       'numpy',  
                       'pandas',

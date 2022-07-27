@@ -1,0 +1,8 @@
+numpy
+matplotlib
+matplotlib.pyplot as plt
+numpy
+pandas
+lightkurve
+statsmodels
+scipy
