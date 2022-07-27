@@ -10,12 +10,4 @@ Welcome to SpinSpotter's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   function_library
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   function_library.rst
