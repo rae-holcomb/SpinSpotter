@@ -1,7 +1,6 @@
-numpy
-matplotlib
-numpy
-pandas
+matplotlib>=3.5
+numpy>=1.23.0
+pandas>=1.4
 lightkurve>=2.0
 statsmodels
 scipy
