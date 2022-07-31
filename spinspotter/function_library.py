@@ -244,162 +244,188 @@ def fft_find_peaks(result, plot=False):
 
     return acf_pgi, output
 
-# def prep_LightCurveCollection(collection, bs=120):
-#     """Takes a LightCurveCollection and stitches it into a single LC object."""
-#     # Step 1 & 2: Normalize and concatentate
-#     lc_stitched = collection.stitch(corrector_func=median_normalize)
+def prep_LightCurveCollection(collection, bs=120):
+    """
+    Takes a LightCurveCollection and stitches it into a single LC object. Also applies normalization and cleaning function.
 
-#     # Step 3: Bin to even cadence.
-#     time, flux, flux_err = bin_lc(lc_stitched.time.value, lc_stitched.flux.value, 
-#                            flux_err=lc_stitched.flux_err.value, bs=bs)
-#     lc_clean = lk.LightCurve(time=time, flux=flux, flux_err=flux_err, meta=lc_stitched.meta)    
+    Args:
+        collection (:obj:`LightCurveCollection obj`): LightCurveCollection object as created by the Lightkurve package.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
 
-#     # Step 4: Subtract the mean of the stitched LC
-#     lc_clean.flux = lc_clean.flux.value - np.nanmean(lc_clean.flux.value)
+    Returns:
+        lc_clean (:obj:`LightCurve obj`): the stitched, cleaned, and median normalized lightcurve.
+    """
+    # Step 1 & 2: Normalize and concatentate
+    lc_stitched = collection.stitch(corrector_func=median_normalize)
 
-#     # Update the sector information to be correct
-#     sectors = []
-#     for lc in collection:
-#         try :
-#             sectors.append(lc.meta['SECTOR'])
-#         except :
-#             try :
-#                 sectors.append(lc.meta['QUARTER'])
-#             except :
-#                 pass
-#     try :
-#         lc_clean.meta['SECTOR'] = sectors
-#     except :
-#         try :
-#             lc_clean.meta['QUARTER'] = sectors
-#         except :
-#             pass
+    # Step 3: Bin to even cadence.
+    time, flux, flux_err = bin_lc(lc_stitched.time.value, lc_stitched.flux.value, 
+                           flux_err=lc_stitched.flux_err.value, bs=bs)
+    lc_clean = lk.LightCurve(time=time, flux=flux, flux_err=flux_err, meta=lc_stitched.meta)    
+
+    # Step 4: Subtract the mean of the stitched LC
+    lc_clean.flux = lc_clean.flux.value - np.nanmean(lc_clean.flux.value)
+
+    # Update the sector information to be correct
+    sectors = []
+    for lc in collection:
+        try :
+            sectors.append(lc.meta['SECTOR'])
+        except :
+            try :
+                sectors.append(lc.meta['QUARTER'])
+            except :
+                pass
+    try :
+        lc_clean.meta['SECTOR'] = sectors
+    except :
+        try :
+            lc_clean.meta['QUARTER'] = sectors
+        except :
+            pass
             
-#     return lc_clean
+    return lc_clean
 
-# def gaussian(fwhm):
-#     """
-#     Creates a gaussian with a given FWHM as preparation for convolution with a light curve.
+def gaussian(fwhm):
+    """
+    Creates a gaussian with a given FWHM as preparation for convolution with a light curve.
 
-#     Args:
-#         fwhm (:obj:`float`): the full width half max of the desired gaussian.
-#         bs (:obj:`float`): the size of the bins, in units of seconds.
+    Args:
+        fwhm (:obj:`float`): the full width half max of the desired gaussian.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
 
-#     Returns:
-#         gaussian (:obj:`arr`): a gaussian.
-#     """
-#     sigma = fwhm / 2.355
-#     x = np.arange(-3*sigma, 3*sigma)
-#     # note that we divide by .997 to preserve the normalization and make the
-#     # area under the truncated gaussian equal to 1
-#     return 1./.997 * 1./(np.sqrt(2.*np.pi) * sigma) * np.exp(-(x/sigma)**2./2.)
+    Returns:
+        gaussian (:obj:`arr`): a gaussian.
+    """
+    sigma = fwhm / 2.355
+    x = np.arange(-3*sigma, 3*sigma)
+    # note that we divide by .997 to preserve the normalization and make the
+    # area under the truncated gaussian equal to 1
+    return 1./.997 * 1./(np.sqrt(2.*np.pi) * sigma) * np.exp(-(x/sigma)**2./2.)
 
-# def parabola(x,a,b,c):
-#     """
-#     Creates a parabola of the form y = ax^2 + bx + c. Intended to be used by curvefit in the process Test.
+def parabola(x,a,b,c):
+    """
+    Creates a parabola of the form y = ax^2 + bx + c. Intended to be used by curvefit in the process Test.
 
-#     Args:
-#         x (:obj:`arr`): the x range of the function.
-#         a, b, c (:obj:`float`): coefficients
+    Args:
+        x (:obj:`arr`): the x range of the function.
+        a, b, c (:obj:`float`): coefficients
 
-#     Returns:
-#         y (:obj:`arr`): a parabola.
-#     """
-#     return a*np.square(x) + b*x + c
+    Returns:
+        y (:obj:`arr`): a parabola.
+    """
+    return a*np.square(x) + b*x + c
 
-# def curvefit_peak(func,corr,pgi,peak_num,plot=False):
-#     """
-#     Fits a function (parabola intended) to a feature of an acf. pgi is the 
-#     period_guess_index, i.e. the intial guess for the index location of the first
-#     peak in the acf, as identified from an fft. peak_num is indicated which alias
-#     you are trying to fit (1 being the original peak, 2 being the first alias.) 
-#     print_result and plot have yet to be implemented, but are intended to help
-#     summarize and visualize results.
-#     """
-#     # clip the acf to a length of a period guess, centered on the period guess
-#     k_snip = np.arange(pgi*peak_num - pgi/4, pgi*peak_num + pgi/4).astype(int)
-#     corr_snip = corr[k_snip]
-#     x_snip = np.arange(len(k_snip)).astype(int)  # synthetic x-axis
+def curvefit_peak(func,acf,pgi,peak_num,plot=False):
+    """
+    Bins a timeseries to the desired cadence. Works much faster than Lightkurve's built in binning function.
+
+    Args:
+        func (:obj:`func`): the function to be fitted to peaks in the ACF, intended to be the `parabola()` function.
+        corr (:obj:`1D array`): the autocorrelation function.
+        pgi (:obj:`int`): period_guess_index, i.e. the intial guess for the index location of the first peak in the `corr` array (aka the acf), usually identified from the highest peak in the FFT of the ACF.
+        peak_num (:obj:`int`): which alias you are trying to fit (1 being the original peak, 2 being the first alias.)
+        plot (:obj:`bool`, optional): if True, will plot the ACF and the fitted parabolas.
+
+    Returns:
+    Two parameters, or three if a flux_err is also provided.
+
+        - fit_params (:obj:`array`): [a0,b0,c0], the coeffitients of the fitted parabola.
+        - R_adj (:obj:`float`): the adjusted R^2 value of the parabola fit.
+        - fitted_parabola (:obj:`array`): y-values of the fitted parabola.
+        - hwhm (:obj:`float`): the half-width half-max of the fitted parabola. Used in error calculations.
+    """
+    # clip the acf to a length of a period guess, centered on the period guess
+    k_snip = np.arange(pgi*peak_num - pgi/4, pgi*peak_num + pgi/4).astype(int)
+    corr_snip = corr[k_snip]
+    x_snip = np.arange(len(k_snip)).astype(int)  # synthetic x-axis
     
-#     # do a regression to fit the function
-#     # make an array for the weights
-#     # gauss = 1.0 - gaussian(len(x_snip)/2.4)
-#     # start = (len(gauss)-len(x_snip))/2
-#     # weights = gauss[start:(start+len(x_snip))]
-#     # params_opt stands for optimal parameters
-#     [a0,b0,c0], pcov = curve_fit(func, x_snip, corr_snip)
-#     # [a0,b0,c0], pcov = curve_fit(func, x_snip, corr_snip, sigma=weights, absolute_sigma=True)
+    # do a regression to fit the function
+    # make an array for the weights
+    # gauss = 1.0 - gaussian(len(x_snip)/2.4)
+    # start = (len(gauss)-len(x_snip))/2
+    # weights = gauss[start:(start+len(x_snip))]
+    # params_opt stands for optimal parameters
+    [a0,b0,c0], pcov = curve_fit(func, x_snip, corr_snip)
+    # [a0,b0,c0], pcov = curve_fit(func, x_snip, corr_snip, sigma=weights, absolute_sigma=True)
 
-#     # calculate the expected curve from the fit parameters
-#     # note the the output is in lags, need to do conversions to get period in days again
-#     fitted_parabola = func(x_snip, *[a0,b0,c0])
+    # calculate the expected curve from the fit parameters
+    # note the the output is in lags, need to do conversions to get period in days again
+    fitted_parabola = func(x_snip, *[a0,b0,c0])
 
-#     # calculate the other params you want
-#     # note correction to P_rot0 to make up for the shift in the window that was fit
-#     P_rot0 = -1.*b0 / (2*a0) + 3*pgi/4.   # note that P_rot0 is in lags, NOT time units
-#     A0 = c0 - np.square(b0) / (4*a0)
+    # calculate the other params you want
+    # note correction to P_rot0 to make up for the shift in the window that was fit
+    P_rot0 = -1.*b0 / (2*a0) + 3*pgi/4.   # note that P_rot0 is in lags, NOT time units
+    A0 = c0 - np.square(b0) / (4*a0)
     
-#     # B0 = -1. * a0 * np.square(P_rot0)
-#     # new value of B0 is the width of the parabola at the zero crossing    
-#     # to avoid warning, check if there is an intercept    
-#     if (b0**2 - 4*a0*c0) < 0 :
-#         intercept1 = np.nan 
-#         intercept2 = np.nan
-#     else :
-#         intercept1 = (-b0 + np.sqrt(b0**2 - 4*a0*c0)) / (2 * a0)
-#         intercept2 = (-b0 - np.sqrt(b0**2 - 4*a0*c0)) / (2 * a0)
-#     B0 = np.abs((intercept1 - intercept2) / P_rot0)
+    # B0 = -1. * a0 * np.square(P_rot0)
+    # new value of B0 is the width of the parabola at the zero crossing    
+    # to avoid warning, check if there is an intercept    
+    if (b0**2 - 4*a0*c0) < 0 :
+        intercept1 = np.nan 
+        intercept2 = np.nan
+    else :
+        intercept1 = (-b0 + np.sqrt(b0**2 - 4*a0*c0)) / (2 * a0)
+        intercept2 = (-b0 - np.sqrt(b0**2 - 4*a0*c0)) / (2 * a0)
+    B0 = np.abs((intercept1 - intercept2) / P_rot0)
     
-#     # gather things up
-#     fit_params = [a0,b0,c0]
-#     peak_params = [P_rot0, A0, B0]
+    # gather things up
+    fit_params = [a0,b0,c0]
+    peak_params = [P_rot0, A0, B0]
 
-#     # check how good the fit is with the adjusted R^2 statistic
-#     R_adj = adjusted_R_sq(corr_snip, fitted_parabola)
+    # check how good the fit is with the adjusted R^2 statistic
+    R_adj = adjusted_R_sq(corr_snip, fitted_parabola)
 
-#     # calculate the half-width half-max of the peak
-#     if np.isnan(intercept1) or np.isnan(intercept2) :
-#         hwhm = np.nan
-#     else :
-#         x1 = (-b0 + np.sqrt(b0**2 - 4*a0*(c0-A0/2))) / (2 * a0)
-#         x2 = (-b0 - np.sqrt(b0**2 - 4*a0*(c0-A0/2))) / (2 * a0)
-#         hwhm = np.abs(x2-x1) / 2
+    # calculate the half-width half-max of the peak
+    if np.isnan(intercept1) or np.isnan(intercept2) :
+        hwhm = np.nan
+    else :
+        x1 = (-b0 + np.sqrt(b0**2 - 4*a0*(c0-A0/2))) / (2 * a0)
+        x2 = (-b0 - np.sqrt(b0**2 - 4*a0*(c0-A0/2))) / (2 * a0)
+        hwhm = np.abs(x2-x1) / 2
 
-#     # plot if requested
-#     if plot:
-#         if peak_num == 1:
-#             plt.figure(figsize=[9,5])
-#             plt.plot(corr[:(len(corr))])
-#         plt.plot(k_snip,fitted_parabola)
+    # plot if requested
+    if plot:
+        if peak_num == 1:
+            plt.figure(figsize=[9,5])
+            plt.plot(corr[:(len(corr))])
+        plt.plot(k_snip,fitted_parabola)
         
-#     # # print the resulting params and R_adj if desired
-#     # if print_result:
-#     #     print( "Optimal params: " + str(params_opt))
-#     #     print( "Adjusted R^2 for curvefit: " + str(R_adj))
+    # # print the resulting params and R_adj if desired
+    # if print_result:
+    #     print( "Optimal params: " + str(params_opt))
+    #     print( "Adjusted R^2 for curvefit: " + str(R_adj))
 
-#     return fit_params, peak_params, R_adj, fitted_parabola, hwhm
+    return fit_params, peak_params, R_adj, fitted_parabola, hwhm
 
-# def adjusted_R_sq(obs,exp,num_param=3):
-#     """
-#     Calculates the adjusted R^2 statistic to estimate the success of a model. Formula implemented
-#     from equation 7.62 in Modern Statistical Methods for Astronomy by Feigelson and Babu.
-#     """
-#     if len(obs) != len(exp):
-#         print( "The length of the observed and expected arrays should be equal.")
-#     n = len(obs)
-#     exp_mean = np.mean(obs) / float(n)
+def adjusted_R_sq(obs,exp,num_param=3):
+    """
+    Calculates the adjusted R^2 statistic to estimate the success of a model. Formula implemented from equation 7.62 in Modern Statistical Methods for Astronomy by Feigelson and Babu.
 
-#     # calculate the R^2 statistic first
-#     numerator = 0.
-#     denominator = 0.
-#     for i in range(n):
-#         numerator += np.square(obs[i] - exp[i])
-#         denominator += np.square(obs[i] - exp_mean)
-#     R_sq_inv = np.divide(numerator, denominator) # this is actually 1-R^2, not R^2
+    Args:
+        obs (:obj:`float`): the observed value.
+        exp (:obj:`float`): the expected value.
+        num_param (:obj:`int`): the number of parameters used in the fit.
 
-#     # now calculate the adjusted R^2 to take into account the number of model parameters
-#     R_adj = 1. - (n - 1.)/(n - num_param) * R_sq_inv
-#     return R_adj
+    Returns:
+        R_adj (:obj:`float`): the adjusted R^2 statistic.
+    """
+    if len(obs) != len(exp):
+        print( "The length of the observed and expected arrays should be equal.")
+    n = len(obs)
+    exp_mean = np.mean(obs) / float(n)
+
+    # calculate the R^2 statistic first
+    numerator = 0.
+    denominator = 0.
+    for i in range(n):
+        numerator += np.square(obs[i] - exp[i])
+        denominator += np.square(obs[i] - exp_mean)
+    R_sq_inv = np.divide(numerator, denominator) # this is actually 1-R^2, not R^2
+
+    # now calculate the adjusted R^2 to take into account the number of model parameters
+    R_adj = 1. - (n - 1.)/(n - num_param) * R_sq_inv
+    return R_adj
 
 
 # # NEW PROCESS FUNCTIONS
@@ -452,7 +478,6 @@ def fft_find_peaks(result, plot=False):
 #                 fits_result['SECTOR'] = lc.meta['QUARTER']
 #             except:
 #                 fits_result['SECTOR'] = 'Unknown'
-
     
 #     return fits_result
 
