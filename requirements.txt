@@ -2,6 +2,6 @@ numpy
 matplotlib
 numpy
 pandas
-lightkurve
+lightkurve>=2.0
 statsmodels
 scipy
