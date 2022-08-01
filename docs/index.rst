@@ -11,5 +11,4 @@ Welcome to SpinSpotter's documentation!
    :caption: Contents:
 
    function_library.rst
-   mix_functions.rst
 
