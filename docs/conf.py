@@ -14,7 +14,9 @@ import os
 import sys
 # sys.path.insert(0, os.path.abspath('../SpinSpotter/'))
 # sys.path.insert(0, os.path.abspath('../'))
-sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('../'))
+# sys.path.append('/home/workspace/myproj/myproj')
+
 
 # -- Project information -----------------------------------------------------
 
