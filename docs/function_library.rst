@@ -2,6 +2,7 @@
 
 SpinSpotter Functions
 =====================
+.. module:: SpinSpotter
 
-.. automodule:: function_library
+.. automodule:: SpinSpotter.function_library
    :members:
