@@ -1,4 +1,9 @@
 # SpinSpotter
+
+
+[![DOI](https://zenodo.org/badge/457129702.svg)](https://zenodo.org/badge/latestdoi/457129702)
+
+
 SpinSpotter is an automated algorithm to calculate stellar rotation periods from high-cadence photometry.
 SpinSpotter is currently still under construction! The code hosted here functions but is still being cleaned up for usability.
 
