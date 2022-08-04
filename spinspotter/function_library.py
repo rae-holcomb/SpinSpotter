@@ -432,15 +432,17 @@ def adjusted_R_sq(obs,exp,num_param=3):
 
 def calc_acf(lc, bs=cadence, max_lag=None, smooth=None, sector_label=False):
     """
-    Caculates the acf of a time_series.
+    Caculates the autocorrelation function (ACF) of a light curve..
 
-    Inputs: 
-        lc -- light curve object, already cleaned
-        bs -- binsize in seconds
-        max_lag -- maximum lag to calculate the ACF to in days
-        sector_label -- allows you to set a custom sector label, must be castable to a string
-    Outputs: a fits_result dictionary
-        ELABORATE ON KEYS
+    Args:
+        lc (:obj:`LightCurve obj`): the cleaned lightcurve.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+        max_lag (:obj:`float`, optional): the maximum lag to which to calculate the ACF in units of days.
+        smooth (:obj:`int`, optional): if supplied, will apply smoothing to the LC before fitting parabolas by convolving with a gaussian with a FWHM equal to this value.
+        sector_label (:obj:`int` or :obj:`str`, optional): tallows you to set a custom sector label, must be castable to a string
+
+    Returns:
+        fits_result (:obj:`dict`): A dictionary containing information on the light curve and it's ACF.
     """
     fits_result = {'time_even':lc.time.value, 'flux_even':lc.flux.value, 'flux_err_even':lc.flux_err.value,
        'acf_lags':np.array([]), 'acf':np.array([]), 'acf_smooth':np.array([]),
@@ -481,180 +483,199 @@ def calc_acf(lc, bs=cadence, max_lag=None, smooth=None, sector_label=False):
     
     return fits_result
 
-# def calc_parabolas(corr, TICID=None, bs=cadence, smooth=None, prot_prior_func=calc_fft_pgi, prot_prior_func_kwargs={}):
-#     """
-#     Given an ACF, fits parabolas to its peaks and 
+def calc_parabolas(corr, TICID=None, bs=cadence, smooth=None, prot_prior_func=calc_fft_pgi, prot_prior_func_kwargs={}):
+    """
+    Calculates the best fit parabolas to peaks in an acf.
 
-#     add docstring
-#     Does the process test, but takes in ONLY the ACF as an input.
-    
-#     """
-#     # make a dictionary to store results in 
-#     # any key ending with _k is an array length 5, where the value at each index
-#     # is associated with a fit to a different peak in the acf. fitted_parabola_k is an
-#     # array of arrays, each of which is the parabola fit to one of the peaks.
-#     # 'fail', when set to True, indicates that the test could not be completed
-#     # due to finding a pgi greater than half the sample length.
-#     # 'half_period' describes whether there peaks in the ACF at half periods due to
-#     # having spots in opposite hemispheres. 'half_period_check' means that the peak
-#     # height difference is less than 5% and needs to be checked by hand.
-#     results = {'smooth':smooth, 'fft':None, 'fft_period':None, 'pgi':np.nan,
-#                'a_k':np.array([]), 'b_k':np.array([]), 'c_k':np.array([]), 
-#                'Rsq_k':np.array([]), 'hwhm_k':np.array([]), 'fitted_parabola_k':[[],[],[],[],[]],
-#                'P_k':np.array([]), 'A_k':np.array([]), 'B_k':np.array([]), 
-#                'P_avg':np.nan, 'A_avg':np.nan, 'B_avg':np.nan, 'R_avg':np.nan, 'fft_prom':np.nan,
-#                'P_err':np.nan,
-#                'half_period': False, 'half_period_check':False,
-#                'fail':False }
+    Args:
+        corr (:obj:`1D array`): the autocorrelation function.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+        TICID (:obj:`int` or :obj:`str`, optional): the ID for the object.
+        smooth (:obj:`int`, optional): if supplied, will apply smoothing to the LC before fitting parabolas by convolving with a gaussian with a FWHM equal to this value.
+        prot_prior_func (:obj:`func`, optional): the function to be used to idntify the period_guess_index (pgi) for the rotation period. Defaults to `calc_fft_pgi()`
+        prot_prior_func_kwargs (:obj:`dict`, optional): keyword arguments for the `prot_prior_func` function.
+
+    Returns:
+        results (:obj:`dict`): a dictionary of info on the parabola fits.
+    """
+    # make a dictionary to store results in 
+    # any key ending with _k is an array length 5, where the value at each index
+    # is associated with a fit to a different peak in the acf. fitted_parabola_k is an
+    # array of arrays, each of which is the parabola fit to one of the peaks.
+    # 'fail', when set to True, indicates that the test could not be completed
+    # due to finding a pgi greater than half the sample length.
+    # 'half_period' describes whether there peaks in the ACF at half periods due to
+    # having spots in opposite hemispheres. 'half_period_check' means that the peak
+    # height difference is less than 5% and needs to be checked by hand.
+    results = {'smooth':smooth, 'fft':None, 'fft_period':None, 'pgi':np.nan,
+               'a_k':np.array([]), 'b_k':np.array([]), 'c_k':np.array([]), 
+               'Rsq_k':np.array([]), 'hwhm_k':np.array([]), 'fitted_parabola_k':[[],[],[],[],[]],
+               'P_k':np.array([]), 'A_k':np.array([]), 'B_k':np.array([]), 
+               'P_avg':np.nan, 'A_avg':np.nan, 'B_avg':np.nan, 'R_avg':np.nan, 'fft_prom':np.nan,
+               'P_err':np.nan,
+               'half_period': False, 'half_period_check':False,
+               'fail':False }
         
-#     # if smoothing of the acf is requested, apply it
-#     if smooth :
-#         corr_smooth = np.convolve(corr, gaussian(smooth), mode="same")
-#         corr = corr_smooth
+    # if smoothing of the acf is requested, apply it
+    if smooth :
+        corr_smooth = np.convolve(corr, gaussian(smooth), mode="same")
+        corr = corr_smooth
     
-#     # if the pgi is given as a number, use that
-#     if (type(prot_prior_func)==float) or (type(prot_prior_func)==int):
-#         # the pgi will be the index of the acf_lags closes to the provided number in days
-#         prot_prior_lags = int(days_to_bins(prot_prior_func, bs))
-#         pgi = min(range(len(corr)), key=lambda i: abs(range(len(corr))[i]-prot_prior_lags))
-#         results['pgi'] = pgi
-#     else :
-#         # Calculate the pgi (initial guess for the period)
-#         # by default, this will use the funciton calc_fft_pgi, which selects the highest peak in the 
-#         # FFT of the ACF. You can also write a custom pgi-finding function and pass it in to process_test_raw
-#         pgi, pgi_results = prot_prior_func(corr, bs=bs, **prot_prior_func_kwargs)
+    # if the pgi is given as a number, use that
+    if (type(prot_prior_func)==float) or (type(prot_prior_func)==int):
+        # the pgi will be the index of the acf_lags closes to the provided number in days
+        prot_prior_lags = int(days_to_bins(prot_prior_func, bs))
+        pgi = min(range(len(corr)), key=lambda i: abs(range(len(corr))[i]-prot_prior_lags))
+        results['pgi'] = pgi
+    else :
+        # Calculate the pgi (initial guess for the period)
+        # by default, this will use the funciton calc_fft_pgi, which selects the highest peak in the 
+        # FFT of the ACF. You can also write a custom pgi-finding function and pass it in to process_test_raw
+        pgi, pgi_results = prot_prior_func(corr, bs=bs, **prot_prior_func_kwargs)
         
-#         # update the results dictionary
-#         results.update(pgi_results)
-#         results['pgi'] = pgi
+        # update the results dictionary
+        results.update(pgi_results)
+        results['pgi'] = pgi
      
-#     # run curvefit_peaks for the first peak and up to four aliases
-#     for peak_num in range(1,6) :
-#         # check that the alias won't extend beyond end of the acf
-#         if peak_num*pgi + pgi/4 < len(corr) :
-#             # run curvefit
-#             fit_params, peak_params, R_adj, fitted_parabola, hwhm = curvefit_peak(parabola, corr, pgi, peak_num)
+    # run curvefit_peaks for the first peak and up to four aliases
+    for peak_num in range(1,6) :
+        # check that the alias won't extend beyond end of the acf
+        if peak_num*pgi + pgi/4 < len(corr) :
+            # run curvefit
+            fit_params, peak_params, R_adj, fitted_parabola, hwhm = curvefit_peak(parabola, corr, pgi, peak_num)
             
-#             # add results to the appropriate dictionary
-#             results['a_k'] = np.append(results['a_k'], fit_params[0])
-#             results['b_k'] = np.append(results['b_k'], fit_params[1])
-#             results['c_k'] = np.append(results['c_k'], fit_params[2])
-#             results['P_k'] = np.append(results['P_k'], peak_params[0])
-#             results['A_k'] = np.append(results['A_k'], peak_params[1])
-#             results['B_k'] = np.append(results['B_k'], peak_params[2])
-#             results['Rsq_k'] = np.append(results['Rsq_k'], R_adj)
-#             results['hwhm_k'] = np.append(results['hwhm_k'], hwhm)
-#             results['fitted_parabola_k'][peak_num-1] = fitted_parabola
-#         else :
-#             # trim fitted_parabola_k to the appropriate length
-#             results['fitted_parabola_k'] = results['fitted_parabola_k'][:peak_num]
+            # add results to the appropriate dictionary
+            results['a_k'] = np.append(results['a_k'], fit_params[0])
+            results['b_k'] = np.append(results['b_k'], fit_params[1])
+            results['c_k'] = np.append(results['c_k'], fit_params[2])
+            results['P_k'] = np.append(results['P_k'], peak_params[0])
+            results['A_k'] = np.append(results['A_k'], peak_params[1])
+            results['B_k'] = np.append(results['B_k'], peak_params[2])
+            results['Rsq_k'] = np.append(results['Rsq_k'], R_adj)
+            results['hwhm_k'] = np.append(results['hwhm_k'], hwhm)
+            results['fitted_parabola_k'][peak_num-1] = fitted_parabola
+        else :
+            # trim fitted_parabola_k to the appropriate length
+            results['fitted_parabola_k'] = results['fitted_parabola_k'][:peak_num]
 
-#     # add the averaged values to the results dictionary
-#     results['A_avg'] = np.nanmean(results['A_k'])
-#     results['B_avg'] = np.nanmean(results['B_k'])
-#     results['R_avg'] = np.nanmean(results['Rsq_k'])
+    # add the averaged values to the results dictionary
+    results['A_avg'] = np.nanmean(results['A_k'])
+    results['B_avg'] = np.nanmean(results['B_k'])
+    results['R_avg'] = np.nanmean(results['Rsq_k'])
     
-#     # calculate the error bar on P_avg
-#     if len(results['P_k']) >= 3 :
-#         results['P_err'] = np.std(results['P_k'])/np.sqrt(len(results['P_k']))
-#     else :
-#         results['P_err'] = np.nanmean(results['hwhm_k'])
+    # calculate the error bar on P_avg
+    if len(results['P_k']) >= 3 :
+        results['P_err'] = np.std(results['P_k'])/np.sqrt(len(results['P_k']))
+    else :
+        results['P_err'] = np.nanmean(results['hwhm_k'])
 
     
-    
-#     # Select the rotation period, keeping in mind that there may be spots in opposite hemispheres
-#     # Check for alternating peak heights in the ACF.
-#     if len(results['A_k']) > 2 :
-#         # check if the second peak is higher than the 1st or 3rd by more than 5%
-#         if results['A_k'][1]*.95 > results['A_k'][0] and results['A_k'][1]*.95 > results['A_k'][2] :
-#             # this is the unambiguous case, definitely a half period
-#             try: 
-#                 results['P_avg'] = np.nanmean([results['P_k'][1], results['P_k'][3]]) * 2
-#             except:
-#                 results['P_avg'] = results['P_k'][1]
+    # Select the rotation period, keeping in mind that there may be spots in opposite hemispheres
+    # Check for alternating peak heights in the ACF.
+    if len(results['A_k']) > 2 :
+        # check if the second peak is higher than the 1st or 3rd by more than 5%
+        if results['A_k'][1]*.95 > results['A_k'][0] and results['A_k'][1]*.95 > results['A_k'][2] :
+            # this is the unambiguous case, definitely a half period
+            try: 
+                results['P_avg'] = np.nanmean([results['P_k'][1], results['P_k'][3]]) * 2
+            except:
+                results['P_avg'] = results['P_k'][1]
             
-#             results['half_period'] = True
+            results['half_period'] = True
             
-#         elif results['A_k'][1] > results['A_k'][0] and results['A_k'][1] > results['A_k'][2]:
-#             # this is the ambiguous case, less than 5% difference in peak height
-#             # does NOT automatically update P_avg, this will have to be done by hand when checked
-#             results['P_avg'] = np.nanmean(results['P_k'])
-#             results['half_period_check'] = True
-#         else:
-#             results['P_avg'] = np.nanmean(results['P_k'])
+        elif results['A_k'][1] > results['A_k'][0] and results['A_k'][1] > results['A_k'][2]:
+            # this is the ambiguous case, less than 5% difference in peak height
+            # does NOT automatically update P_avg, this will have to be done by hand when checked
+            results['P_avg'] = np.nanmean(results['P_k'])
+            results['half_period_check'] = True
+        else:
+            results['P_avg'] = np.nanmean(results['P_k'])
               
-#     # now, everything in the results dictionary should be taken care of
-#     return results
+    # now, everything in the results dictionary should be taken care of
+    return results
 
-# def process_LightCurve(lc, bs=cadence, precleaned=False,
-#                         cleaning_func=default_cleaning_func, cleaning_func_kwargs={},  transit=None,
-#                         max_lag=None, smooth=None, sector_label=None,
-#                         prot_prior='fft', prot_prior_func=None, prot_prior_func_kwargs={}):
-#     """
-#     Takes in a single light curve object, returns the fits_result and the process_result.
-#         lc -- the light curve to be processed
-#         bs -- binsize in seconds
-#         precleaned -- set to True if the lc has already been normalized and binned to even cadence.
-#         cleaning_func -- the function to be used to "clean" the light curve. 
-#         max_lag -- maximum lag to calculate the ACF to in days
-#         prot_prior -- the method to be used to determine the initial period estimate
-#                     'fft' will call the default fft-peak-finding function
-#                     'custom' will call the function passed to prot_prior_func
-#                     an integer will use that number (in days) as the period prior
+def process_LightCurve(lcc, bs=cadence, precleaned=False,
+                        cleaning_func=default_cleaning_func, cleaning_func_kwargs={},  transit=None,
+                        max_lag=None, smooth=None, sector_label=None,
+                        prot_prior='fft', prot_prior_func=None, prot_prior_func_kwargs={}):
+    """
+    Bins a timeseries to the desired cadence. Works much faster than Lightkurve's built in binning function.
 
-#     Input:
-#     Output: Tuple containing the (fits_result, process_result)
+    Args:
+        lc (:obj:`LightCurve obj`): the cleaned lightcurve.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+        precleaned (:obj:`bool`, optional): set to True if the provided `lc` argument has already been cleaned and normalized.
+        cleaning_func (:obj:`func`, optional): the function to be used to clean and normalize the light curve, defaults to `default_cleaning_func()`.
+        cleaning_func_kwargs (:obj:`dict`, optional): kwargs for the `cleaning_func`.
+        transit (:obj:`array`, optional): array of transit paramters like [period, epoch, duration] in units of days each entry can be an array if there are multiple planets. Also used by `default_cleaning_func`.
+        max_lag (:obj:`float`, optional): the maximum lag to which to calculate the ACF in units of days.
+        smooth (:obj:`int`, optional): if supplied, will apply smoothing to the LC before fitting parabolas by convolving with a gaussian with a FWHM equal to this value.
+        sector_label (:obj:`int` or :obj:`str`, optional): tallows you to set a custom sector label, must be castable to a string.
+        prot_prior_func (:obj:`func`, optional): the function to be used to idntify the period_guess_index (pgi) for the rotation period. Defaults to `calc_fft_pgi()`
+        prot_prior_func_kwargs (:obj:`dict`, optional): keyword arguments for the `prot_prior_func` function.
 
-#     """
-#     # perform normalization and binning if that has not already been done to the LC.
-#     if precleaned :
-#         lc_clean = lc
-#     if not precleaned :
-#         # apply the cleaning function
-#         if transit :
-#             cleaning_func_kwargs['transit'] = transit
-#         lc_clean = cleaning_func(lc, bs=bs, **cleaning_func_kwargs)
+    Returns:
+    Two parameters
+
+        - fits_result (:obj:`dict`): dictionary containing information on the LC and ACF.
+        - process_result (:obj:`dict`): dictionary containing information on the parabola fits.
+    """
+    # perform normalization and binning if that has not already been done to the LC.
+    if precleaned :
+        lc_clean = lc
+    if not precleaned :
+        # apply the cleaning function
+        if transit :
+            cleaning_func_kwargs['transit'] = transit
+        lc_clean = cleaning_func(lc, bs=bs, **cleaning_func_kwargs)
     
-#     # calculate the acf
-#     fits_result = calc_acf(lc_clean, bs=bs, max_lag=max_lag, smooth=smooth)
+    # calculate the acf
+    fits_result = calc_acf(lc_clean, bs=bs, max_lag=max_lag, smooth=smooth)
 
-#     # add the raw light curve to the fits_result for ease of inspection later on
-#     fits_result['time_raw'] = lc.time.value
-#     fits_result['flux_raw'] = lc.flux.value
-#     fits_result['flux_err_raw'] = lc.flux_err.value
+    # add the raw light curve to the fits_result for ease of inspection later on
+    fits_result['time_raw'] = lc.time.value
+    fits_result['flux_raw'] = lc.flux.value
+    fits_result['flux_err_raw'] = lc.flux_err.value
     
-#     # calculate parabola fits
-#     # first, check what kind of prior was passed
-#     if prot_prior == 'fft':
-#         process_result = calc_parabolas(fits_result['acf'], bs=bs, prot_prior_func=calc_fft_pgi)
-#     elif prot_prior == 'custom':
-#         process_result = calc_parabolas(fits_result['acf'], bs=bs, prot_prior_func=prot_prior_func, 
-#                                 prot_prior_func_kwargs=prot_prior_func_kwargs)
-#     elif type(prot_prior)==int :
-#         process_result = calc_parabolas(fits_result['acf'], bs=bs, prot_prior_func=prot_prior)
-#     else:
-#         process_resutl = {}
-#         print('Invalid argument passed to prot_prior. Please use \'fft\', \'custom\', or a float.')
+    # calculate parabola fits
+    # first, check what kind of prior was passed
+    if prot_prior == 'fft':
+        process_result = calc_parabolas(fits_result['acf'], bs=bs, prot_prior_func=calc_fft_pgi)
+    elif prot_prior == 'custom':
+        process_result = calc_parabolas(fits_result['acf'], bs=bs, prot_prior_func=prot_prior_func, 
+                                prot_prior_func_kwargs=prot_prior_func_kwargs)
+    elif type(prot_prior)==int :
+        process_result = calc_parabolas(fits_result['acf'], bs=bs, prot_prior_func=prot_prior)
+    else:
+        process_resutl = {}
+        print('Invalid argument passed to prot_prior. Please use \'fft\', \'custom\', or a float.')
 
-#     return fits_result, process_result
+    return fits_result, process_result
 
 # def process_LightCurveCollection(lc, cleaning_func=default_cleaning_func, cleaning_func_kwargs={}, bs=cadence, transit=None,
 #                       max_lag=None, smooth=None, sector_label=None,
 #                       prot_prior='fft', prot_prior_func=None, prot_prior_func_kwargs={}):
-#     """
+#    """
 #     Takes in a LightCurveCollection object, returns the fits_result and the process_result.
-#         lc --
-#         cleaning_func --
-#         bs -- binsize in seconds
-#         max_lag -- maximum lag to calculate the ACF to in days
-#         prot_prior -- the method to be used to determine the initial period estimate
-#                     'fft' will call the default fft-peak-finding function
-#                     'custom' will call the function passed to prot_prior_func
-#                     an integer will use that number (in days) as the period prior
 
-#     Input:
-#     Output: Tuple containing the (fits_result, process_result)
+#     Args:
+#         lcc (:obj:`LightCurveCollection obj`): the lightcurve collection.
+#         bs (:obj:`float`): the size of the bins, in units of seconds.
+#         precleaned (:obj:`bool`, optional): set to True if the provided `lc` argument has already been cleaned and normalized.
+#         cleaning_func (:obj:`func`, optional): the function to be used to clean and normalize the light curve, defaults to `default_cleaning_func()`.
+#         cleaning_func_kwargs (:obj:`dict`, optional): kwargs for the `cleaning_func`.
+#         transit (:obj:`array`, optional): array of transit paramters like [period, epoch, duration] in units of days each entry can be an array if there are multiple planets. Also used by `default_cleaning_func`.
+#         max_lag (:obj:`float`, optional): the maximum lag to which to calculate the ACF in units of days.
+#         smooth (:obj:`int`, optional): if supplied, will apply smoothing to the LC before fitting parabolas by convolving with a gaussian with a FWHM equal to this value.
+#         sector_label (:obj:`int` or :obj:`str`, optional): tallows you to set a custom sector label, must be castable to a string.
+#         prot_prior_func (:obj:`func`, optional): the function to be used to idntify the period_guess_index (pgi) for the rotation period. Defaults to `calc_fft_pgi()`
+#         prot_prior_func_kwargs (:obj:`dict`, optional): keyword arguments for the `prot_prior_func` function.
 
+#     Returns:
+#     Two parameters
+
+#         - fits_result (:obj:`dict`): dictionary containing information on the LC and ACF.
+#         - process_result (:obj:`dict`): dictionary containing information on the parabola fits.
 #     """
 #     # apply the cleaning function
 #     if transit :
@@ -687,124 +708,151 @@ def calc_acf(lc, bs=cadence, max_lag=None, smooth=None, sector_label=False):
 
 # # PLOTTING FUNCTIONS
 
-# def custom_plot(x, y, ax=None, **plt_kwargs):
-#     if ax is None:
-#         ax = plt.gca()
-#     ax.plot(x, y, **plt_kwargs) ## example plot here
-#     return(ax)
+def custom_plot(x, y, ax=None, **plt_kwargs):
+    """
+    (Under construction) Custom plotting function.
 
-# def plot_fft(fits_result,process_result, plot_peaks=True, **plt_kwargs):
-#     """
-#     Given the result dictionaries from process_LightCurve, plots the FFT of the ACF. Returns a figure object.
-#     plot_peaks - if True, places a marker on the five tallest peaks in the FFT
-#     """
-#     fft = process_result['fft']
-#     fft_period = process_result['fft_period_days']
-#     pgi = process_result['pgi']
-#     fft_pgi = process_result['fft_pgi']
+    Args:
+        x (:obj:`arr`): the x array.
+        y (:obj:`array`): the y array.
+        ax (:obj:`axis object`, optional): the axis object on which to plot.
+        peak_num (:obj:`int`): which alias you are trying to fit (1 being the original peak, 2 being the first alias.)
+        **plt_kwargs (:obj:`dict`): keyword arguments.
+
+    Returns:
+        ax (:obj:`obj`): the plotted function.
+    """
+    if ax is None:
+        ax = plt.gca()
+    ax.plot(x, y, **plt_kwargs) ## example plot here
+    return(ax)
+
+def plot_fft(fits_result,process_result, plot_peaks=True, **plt_kwargs):
+    """
+    Given the result dictionaries from process_LightCurve, plots the FFT of the ACF. Returns a figure object.
+
+    Args:
+        fits_result (:obj:`dict`): dictionary containing information on the LC and ACF, as returned by `process_LightCurve()`.
+        process_result (:obj:`dict`): dictionary containing information on the parabola fits, as returned by `process_LightCurve()`.
+        plot_peaks (:obj:`dict`):  if True, places a marker on the five tallest peaks in the FFT.
+        plt_kwargs (:obj:`dict`):  keyword arguments for `matplotlib.plt.plot()`.
+    """
+    fft = process_result['fft']
+    fft_period = process_result['fft_period_days']
+    pgi = process_result['pgi']
+    fft_pgi = process_result['fft_pgi']
     
-#     # make le plot!
-#     fig, ax = plt.subplots(1, 1, figsize=[12,5], facecolor='white')
-#     ax.plot(fft_period,fft, color='black', **plt_kwargs)
+    # make le plot!
+    fig, ax = plt.subplots(1, 1, figsize=[12,5], facecolor='white')
+    ax.plot(fft_period,fft, color='black', **plt_kwargs)
 
-#     # also mark the highest peaks, with the highest one marked in red and the rest in green
-#     if plot_peaks :
-#         peaks_x = process_result['max_peaks']
-#         peaks_y = fft[peaks_x]
-#         ax.plot(fft_period[peaks_x], peaks_y, marker='o', color='green',linestyle='', markersize=8, fillstyle='none')
-#         ax.plot(fft_period[fft_pgi], fft[fft_pgi], marker='o', color='red', markersize=8, fillstyle='none')
+    # also mark the highest peaks, with the highest one marked in red and the rest in green
+    if plot_peaks :
+        peaks_x = process_result['max_peaks']
+        peaks_y = fft[peaks_x]
+        ax.plot(fft_period[peaks_x], peaks_y, marker='o', color='green',linestyle='', markersize=8, fillstyle='none')
+        ax.plot(fft_period[fft_pgi], fft[fft_pgi], marker='o', color='red', markersize=8, fillstyle='none')
 
-#     # labels
-#     ax.set_title("FFT of the ACF", fontsize=14)
-#     ax.set_xlabel("Period (days)", fontsize=14)
-#     ax.set_ylabel("FFT Power", fontsize=14)
+    # labels
+    ax.set_title("FFT of the ACF", fontsize=14)
+    ax.set_xlabel("Period (days)", fontsize=14)
+    ax.set_ylabel("FFT Power", fontsize=14)
 
-#     return fig, ax
+    return fig, ax
 
 
 # # PLOTTING AND PRINTING FUNCTIONS
 
-# def print_summary(fits_result, process_result, bs=cadence):
-#     """Prints a summary of a star's descriptive parameters."""
-#     print('Target: ' + str(fits_result['OBJECT']))
-#     print('Sector/Quarter: ' + str(fits_result['SECTOR']))
-#     print('pgi: ' + "%.3f" % bins_to_days(process_result['pgi']/(24*30), bs=bs))
-#     print('A_avg: ' + "%.3f" % (process_result['A_avg']))
-#     print('B_avg: ' + "%.3f" % (process_result['B_avg']))
-#     print('Rsq_avg: ' + "%.3f" % (process_result['R_avg']))
-#     print('P_avg (days): ' + "%.3f" % bins_to_days(process_result['P_avg'], bs=bs))
-#     print('P_err (days): ' + "%.3f" % bins_to_days(process_result['P_err'], bs=bs))
-#     print('HWHM_err (days): ' + "%.3f" % bins_to_days(np.nanmean(process_result['hwhm_k']), bs=bs))
-#     print()
+def print_summary(fits_result, process_result, bs=cadence):
+    """
+    Prints a summary of the descriptive parameters calculated by `process_LightCurve()`.
+    
+    Args:
+        fits_result (:obj:`dict`): dictionary containing information on the LC and ACF, as returned by `process_LightCurve()`.
+        process_result (:obj:`dict`): dictionary containing information on the parabola fits, as returned by `process_LightCurve()`.    
+    """
+    print('Target: ' + str(fits_result['OBJECT']))
+    print('Sector/Quarter: ' + str(fits_result['SECTOR']))
+    print('pgi: ' + "%.3f" % bins_to_days(process_result['pgi']/(24*30), bs=bs))
+    print('A_avg: ' + "%.3f" % (process_result['A_avg']))
+    print('B_avg: ' + "%.3f" % (process_result['B_avg']))
+    print('Rsq_avg: ' + "%.3f" % (process_result['R_avg']))
+    print('P_avg (days): ' + "%.3f" % bins_to_days(process_result['P_avg'], bs=bs))
+    print('P_err (days): ' + "%.3f" % bins_to_days(process_result['P_err'], bs=bs))
+    print('HWHM_err (days): ' + "%.3f" % bins_to_days(np.nanmean(process_result['hwhm_k']), bs=bs))
+    print()
     
 
-# def plot_acf(fits_result,process_result, plot_peaks=True, plot_line=None, cut=10):
-#     """
-#     Provides options to plot the ACF and FFT for a star.
-#     Inputs: fits_result - dict as returned by the process_LightCurve function
-#             process_result - dict as returned by the process_LightCurve function
-#             plot_peaks - if set to True, will overplot the parabola fits to the ACF peaks on the ACF plot
-#             plot_line - if given a lag time in days, will plot a vertical line on the ACF at that x-value,
-#                         indended to plot the found period for visual comparison
-#             cut - plots look better when you cut the first few points off the ACF, to avoid the high peak at (0,1)
-#                   this keyword lets you adjust how many points get cut off the front
-
-#     """        
-#     # make the base plot
-#     # fig_num=plt.figure().number + 1
-#     fig, ax = plt.subplots(1, 1, figsize=[10,5], facecolor='white')
-#     ax.plot(fits_result['acf_lags'][cut:],fits_result['acf'][cut:])
-#     ax.set_xlabel("Period (days)")
-#     ax.set_ylabel("ACF")
-#     ax.set_title("ACF")
-
-#     pgi = process_result['pgi']
-
-#     # check if the test failed
-#     if pgi <= 0 or np.isnan(pgi) :
-#         print('Cannot plot peaks, no plausible rotation period detected.')
-#         return fig, ax
-#     if pgi > len(fits_result['acf_lags']//2) :
-#         print("Test failed due to pgi > 1/2*sample length") 
-#         return fix, ax
+def plot_acf(fits_result,process_result, plot_peaks=True, plot_line=None, cut=10):
+    """
+    Prints a summary of the descriptive parameters calculated by `process_LightCurve()`.
     
+    Args:
+        fits_result (:obj:`dict`): dictionary containing information on the LC and ACF, as returned by `process_LightCurve()`.
+        process_result (:obj:`dict`): dictionary containing information on the parabola fits, as returned by `process_LightCurve()`.   
+        plot_peaks (:obj:`bool`): if set to True, will overplot the parabola fits to the ACF peaks on the ACF plot
+        plot_line (:obj:`float`): if given a lag time in days, will plot a vertical line on the ACF at that x-value, indended to plot the found period for visual comparison
+        cut (:obj:`int`): plots look better when you cut the first few points off the ACF, to avoid the high peak at (0,1). This keyword lets you adjust how many points get cut off the front.
     
-    
-#     # if desired, plot the fitted peaks to the acf
-#     if plot_peaks :
-#         # extract the needed info
-#         # plots look better when you cut off the first few points in the ACF
-#         lag_times = fits_result['acf_lags']
-#         pgi = process_result['pgi']
-#         fitted_parabolas = process_result['fitted_parabola_k']
-#         try : 
-#             acf_snip = pgi * 7
-#         except :
-#             acf_snip = pgi * len(process_result['a_k']) + pgi/2
-#         acf_snip = min(acf_snip, len(lag_times)-1)
+    Returns:
+        fig (:obj:`obj`): the figure object. 
+        ax (:obj:`obj`): the axis object with the plotted function. 
+    """
+    # make the base plot
+    # fig_num=plt.figure().number + 1
+    fig, ax = plt.subplots(1, 1, figsize=[10,5], facecolor='white')
+    ax.plot(fits_result['acf_lags'][cut:],fits_result['acf'][cut:])
+    ax.set_xlabel("Period (days)")
+    ax.set_ylabel("ACF")
+    ax.set_title("ACF")
 
-#         # Set a reasonable limit
-#         ax.set_xlim([0, lag_times[acf_snip]])
+    pgi = process_result['pgi']
+
+    # check if the test failed
+    if pgi <= 0 or np.isnan(pgi) :
+        print('Cannot plot peaks, no plausible rotation period detected.')
+        return fig, ax
+    if pgi > len(fits_result['acf_lags']//2) :
+        print("Test failed due to pgi > 1/2*sample length") 
+        return fig, ax
+
+    # if desired, plot the fitted peaks to the acf
+    if plot_peaks :
+        # extract the needed info
+        # plots look better when you cut off the first few points in the ACF
+        lag_times = fits_result['acf_lags']
+        pgi = process_result['pgi']
+        fitted_parabolas = process_result['fitted_parabola_k']
+        try : 
+            acf_snip = pgi * 7
+        except :
+            acf_snip = pgi * len(process_result['a_k']) + pgi/2
+        acf_snip = min(acf_snip, len(lag_times)-1)
+
+        # Set a reasonable limit
+        ax.set_xlim([0, lag_times[acf_snip]])
         
-#         # now plot each peak
-#         for i in range(len(process_result['a_k'])):
-#             curve = fitted_parabolas[i]
-#             window = len(curve)
-#             snip = np.arange(pgi*(i+1) - window/2, pgi*(i+1) + window/2).astype(int)
-#             lag_snip = lag_times[snip]
-#             plt.plot(lag_snip, curve,linewidth=4,color='r',linestyle='-')
+        # now plot each peak
+        for i in range(len(process_result['a_k'])):
+            curve = fitted_parabolas[i]
+            window = len(curve)
+            snip = np.arange(pgi*(i+1) - window/2, pgi*(i+1) + window/2).astype(int)
+            lag_snip = lag_times[snip]
+            ax.plot(lag_snip, curve,linewidth=4,color='r',linestyle='-')
             
         
-#         # now make it pretty
-#         plt.xlabel("Lag (days)")
-#         plt.ylabel("ACF")
-#         plt.title("ACF")
+        # now make it pretty
+        ax.set_xlabel("Lag (days)")
+        ax.set_ylabel("ACF")
+        ax.set_title("ACF")
 
-#         # if provided, plot a line where requested
-#     if plot_line :
-#         line_y = np.arange(-1.5,1.5,.1)
-#         line_x = np.ones(len(line_y)) * (plot_line)# / (cad/bs)
-#         plt.plot(line_x, line_y, c='g', scaley=False)
+        # if provided, plot a line where requested
+    if plot_line :
+        line_y = np.arange(-1.5,1.5,.1)
+        line_x = np.ones(len(line_y)) * (plot_line)# / (cad/bs)
+        ax.plot(line_x, line_y, c='g', scaley=False)
+
+    return fig, ax
 
 
 
