@@ -27,7 +27,10 @@ For an introduction to using SpinSpotter, check out the jupyter notebook tutoria
 
 More tutorials to be added soon!
 
-![This is an image](/./images/acf_param_plot.png)
-
 ## Documentation
 Documentation for SpinSpotter can be found here: [https://raeholcomb-spinspotter.readthedocs.io/en/latest/](https://raeholcomb-spinspotter.readthedocs.io/en/latest/)
+
+## Contact and Feedback
+If you run into issues with SpinSpotter or have any feedback, please feel free to reach out to me at: raeholcomb15@gmail.com
+
+![This is an image](/./images/acf_param_plot.png)
