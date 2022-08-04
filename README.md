@@ -6,11 +6,20 @@ SpinSpotter is currently still under construction! The code hosted here function
 Thanks for checking out SpinSpotter! Please be aware that the code is in beta and things are changing fast--new tutorials, installation options, testing suites, and code functionality are being added as we speak. I highly recommend checking back pulling new updates often to make sure you're always working with the most up-to-date version of the code. And if you run into any issues or want to request certain features, please reach out to me!
 
 ## Installation
-Please install SpinSpotter using
+
+SpinSpotter can be installed from PyPi via pip
+
+`pip install spinspotter`
+
+
+You can also install it from TestPyPi 
+
+`pip install -i https://test.pypi.org/simple/spinspotter`
+
+
+Or you can install it directly from GitHub
 
 `pip install git+https://github.com/rae-holcomb/SpinSpotter`
-
-More installation options will be added soon.
 
 
 ## Tutorials
