@@ -316,7 +316,7 @@ def parabola(x,a,b,c):
     """
     return a*np.square(x) + b*x + c
 
-def curvefit_peak(func,acf,pgi,peak_num,plot=False):
+def curvefit_peak(func,corr,pgi,peak_num,plot=False):
     """
     Bins a timeseries to the desired cadence. Works much faster than Lightkurve's built in binning function.
 
@@ -594,7 +594,7 @@ def calc_parabolas(corr, TICID=None, bs=cadence, smooth=None, prot_prior_func=ca
     # now, everything in the results dictionary should be taken care of
     return results
 
-def process_LightCurve(lcc, bs=cadence, precleaned=False,
+def process_LightCurve(lc, bs=cadence, precleaned=False,
                         cleaning_func=default_cleaning_func, cleaning_func_kwargs={},  transit=None,
                         max_lag=None, smooth=None, sector_label=None,
                         prot_prior='fft', prot_prior_func=None, prot_prior_func_kwargs={}):
