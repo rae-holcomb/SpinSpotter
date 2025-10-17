@@ -131,13 +131,88 @@ def default_cleaning_func(lc, bs=cadence, transit=None):
 
     return lc_clean
 
-def calc_fft_pgi(corr, bs=cadence):    
+def calc_fft_pgi(corr, bs=cadence, fft_n=10, plot=False):    
     """
     Uses a fast fourier transform to identify an initial guess (pgi) for the dominant periodicity in the autocorrelation function. This is the default pgi-finding function for SpinSpotter.
 
     Args:
         corr (:obj:`arr`): an autocorrelation function.
         bs (:obj:`float`): the size of the bins, in units of seconds.
+        fft_n (:obj:`int`): the coefficient `n` used as input for numpy.fft.rfft
+        plot (:obj:`bool`): toggle to plot the FFT peaks used to inform the period guesses (pgi)
+
+    Returns:
+        - pgi (:obj:`int`): the index in the acf of the initial period guess in units of lags.
+        - results (:obj:`array`): dictionary of other relevant paramters from the pgi-finding code.
+    """
+    # set up results dictionary
+    results = {}
+
+    # Calculate the fft
+    # changing the coeff increasing the frequency sampling
+    fft_n = 10
+    corr_fft = np.real(np.fft.rfft(corr,n=fft_n*len(corr)))
+    fft_period = np.divide(1., np.fft.rfftfreq(fft_n*len(corr))[1:])
+
+    # we're only interested in the positive half of the fft
+    snip = np.where((fft_period >= 0) & (fft_period <= len(corr)))
+    fft_period = fft_period[snip]
+    corr_fft = corr_fft[snip]
+    fft_period_days = np.divide(fft_period, (day/120))
+
+    # find the five tallest peaks, then see how much taller the tallest is
+    fft_peaks, fft_properties = find_peaks(corr_fft)
+    peak_heights = corr_fft[fft_peaks]
+
+    #initialize the matrix to store the indices of the five peaks
+    max_peaks = np.zeros(6,dtype=int)
+
+    # # if the max peak is too small, fail the test and exit
+    # # currently set to cut off when the max peak has index less than 5
+    # if fft_peaks[np.argmax(peak_heights)] < 2 :
+    #     print( "period is too short")
+    #     # return -1, {'pgi':-1, 'fft_pgi':-1}
+
+    # retrieve the peaks
+    for i,val in enumerate(max_peaks) :
+        index = np.argmax(peak_heights)
+        max_peaks[i] = int(fft_peaks[index])
+        peak_heights[index] = 0
+
+    # # calculate the mean and std of all but the largest peak
+    # mean_mp = np.mean(corr_fft[max_peaks[1:]])
+    # std_mp = np.std(corr_fft[max_peaks[1:]])
+
+    # # calc how many stds the max peak is from the rest
+    # pgi_prom = (corr_fft[max_peaks[0]] - mean_mp) / std_mp
+
+    # add to results dictionary
+    results['fft'] = corr_fft
+    results['fft_period'] = fft_period  # period array, in units of index of the acf
+    results['fft_period_days'] = np.divide(fft_period, (day/bs))  # period array, in units of index of days
+    results['max_peaks_index'] = max_peaks   # indexes of max peaks in the fft
+    results['max_peaks_days'] = fft_period_days[max_peaks]   # period of max peaks in the fft
+    results['max_peak_heights'] = peak_heights  # heights of max peaks in the fft
+
+    # if requested, then plot
+    if plot :
+        plt.figure(figsize=[12,5])
+        plt.plot(results['fft_period_days'],corr_fft)
+        plt.plot(results['fft_period_days'][max_peaks],corr_fft[max_peaks], marker='x',linestyle='')
+        plt.xlabel('Period (d)')
+        plt.ylabel('FFT Power')
+
+    return results['max_peaks_days'], results
+
+def calc_fft_pgi_DEFUNCT(corr, bs=cadence, plot=False):    
+    """
+    Uses a fast fourier transform to identify an initial guess (pgi) for the dominant periodicity in the autocorrelation function. This is the default pgi-finding function for SpinSpotter.
+
+    Args:
+        corr (:obj:`arr`): an autocorrelation function.
+        bs (:obj:`float`): the size of the bins, in units of seconds.
+        fft_n (:obj:`int`): the coefficient `n` used as input for numpy.fft.rfft
+        plot (:obj:`bool`): toggle to plot the FFT peaks used to inform the period guesses (pgi)
 
     Returns:
     Two parameters.
@@ -164,7 +239,7 @@ def calc_fft_pgi(corr, bs=cadence):
     # results['pgi'] = pgi
 
     # add the prominence of the fft peak
-    pgi, fft_results = fft_find_peaks(results, plot=False)
+    pgi, fft_results = fft_find_peaks(results, plot=plot)
     results.update(fft_results) 
     
     # if the pgi is more than half the period, automatic fail
@@ -177,13 +252,12 @@ def calc_fft_pgi(corr, bs=cadence):
     
     return pgi, results
 
-def fft_find_peaks(result, plot=False):
+def fft_find_peaks_DEFUNCT(result, plot=False):
     """
     Helper function used by `calc_fft_pgi` to calculate the prominence of the max 
     peak in the fft.Does this by finding the five tallest peaks, then calculates the standard 
     deviation of the tallest one from the other four. setting plot to True will plot the FFT and
-    the five found peaks. Currently, returns the number of standard deviations from
-    the mean that the highest peak is.
+    the five found peaks.
 
     Args:
         result (:obj:`dict`):the result dictionary as outputed by calc_fft_pgi(), which contains the fft.
@@ -239,8 +313,10 @@ def fft_find_peaks(result, plot=False):
     # if requested, then plot
     if plot :
         plt.figure(figsize=[12,5])
-        plt.plot(fft_period,corr_fft)
-        plt.plot(fft_period[max_peaks],corr_fft[max_peaks], marker='x',linestyle='')
+        plt.plot(result['fft_period_days'],corr_fft)
+        plt.plot(result['fft_period_days'][max_peaks],corr_fft[max_peaks], marker='x',linestyle='')
+        plt.xlabel('Period (d)')
+        plt.ylabel('FFT Power')
 
     return acf_pgi, output
 
@@ -616,7 +692,6 @@ def process_LightCurve(lc, bs=cadence, precleaned=False,
 
     Returns:
     Two parameters
-
         - fits_result (:obj:`dict`): dictionary containing information on the LC and ACF.
         - process_result (:obj:`dict`): dictionary containing information on the parabola fits.
     """
